@@ -1,0 +1,10 @@
+__pycache__/
+*.dpr
+lightning_logs/
+processed/
+faiss/
+
+tabert_base_k3/
+tabert_large_k3/
+output/
+result/
