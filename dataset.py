@@ -32,6 +32,18 @@ def get_negative_rank(path=Path('.data/bench/1/rel0_rank'), threshold=0.0811):
     return rank_dict
 
 
+def infer_column_type_from_row_values(heading, body):
+    heading_type = {k : 'real' for k in heading}
+    for n_idx in range(len(heading)):
+        for i, rows in enumerate(body):
+            try:
+                float(rows[n_idx].strip().replace('−','-').replace(',','').replace('–','-'))
+            except:
+                heading_type[heading[n_idx]] = 'text'
+                break
+    return heading_type
+
+
 def encode_tables(table_json, is_slice, query, table_tokenizer):
     rel = table_json['rel']
 
@@ -139,9 +151,10 @@ def encode_tables(table_json, is_slice, query, table_tokenizer):
         column_reps = slice_table(title, heading, body, caption, table_tokenizer, query, rel)
 
     else:
+        column_type = infer_column_type_from_row_values(heading, body)
         column_reps = [(rel,
                         Table(id=caption,
-                              header=[Column(h.strip(), 'text') for h in heading],
+                              header=[Column(h.strip(), column_type[h]) for h in heading],
                               data=body
                               ).tokenize(table_tokenizer))]
     return caption_rep, column_reps
@@ -151,7 +164,8 @@ def slice_table( title, heading, datas, caption, table_tokenizer, query, rel):
 
     min_row = 256  # 최소 5개의 행은 있어야 함
     max_table_nums = 2  # 테이블은 최대 10개로 나뉘어짐
-
+    column_type = infer_column_type_from_row_values(heading, datas)
+    
     # TODO: max_table_nums = 2, 5, 10 으로 바꿔보면서 테스트
     if len(datas) <= min_row:  # 테이블이 최소행 보다 작은 경우
         column_rep = Table(id=title,
@@ -180,14 +194,14 @@ def slice_table( title, heading, datas, caption, table_tokenizer, query, rel):
             if is_always_postive:  # caption에 포함되어있는 경우
                 for rows in slice_row_data:
                     column_rep = Table(id=title,
-                                       header=[Column(h.strip(), 'text') for h in heading],
+                                       header=[Column(h.strip(), column_type[h]) for h in heading],
                                        data=rows
                                        ).tokenize(table_tokenizer)
                     table_rep_list.append((rel, column_rep))
             else:
                 for rows in slice_row_data:
                     column_rep = Table(id=title,
-                                       header=[Column(h.strip(), 'text') for h in heading],
+                                       header=[Column(h.strip(), column_type[h]) for h in heading],
                                        data=rows
                                        ).tokenize(table_tokenizer)
                     modify_rel = '0'
@@ -303,17 +317,7 @@ def query_table_collate_fn(batch):
     return query, columns, caption, torch.Tensor(rel)
 
 
-def infer_column_type_from_row_values(numeric_idx_list, heading, body):
-    heading_type = {k : 'text' for k in heading}
-    for n_idx in numeric_idx_list:
-        heading_type[heading[n_idx]] = 'real'
-        for i, rows in enumerate(body):
-            try:
-                float(rows[n_idx].strip().replace('−','-').replace(',','').replace('–','-'))
-            except:
-                heading_type[heading[n_idx]] = 'text'
-                break
-    return heading_type
+
 
 
 class TableDataset(Dataset):
